@@ -1,0 +1,6 @@
+__pycache__/
+*.py[cod]
+.DS_Store
+*.h5
+logs/
+.ipynb_checkpoints/
