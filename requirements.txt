@@ -1,5 +1,4 @@
 flask==2.3.3
-tensorflow-cpu
-numpy
+requests
 pillow
 gunicorn==21.2.0
