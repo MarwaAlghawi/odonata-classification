@@ -1,4 +1,5 @@
 flask==2.3.3
 requests
+numpy
 pillow
 gunicorn==21.2.0
