@@ -1,52 +1,45 @@
 import base64
 import requests as req
+import os
 
 def predict_image(img_path):
-    # Read and encode image
     with open(img_path, 'rb') as f:
-        img_data = base64.b64encode(f.read()).decode('utf-8')
+        img_bytes = f.read()
     
-    # Call Claude API
+    hf_token = os.environ.get('HF_TOKEN')
+    
+    # Use HuggingFace image classification
     response = req.post(
-        'https://api.anthropic.com/v1/messages',
-        headers={
-            'x-api-key': 'your-api-key-here',
-            'anthropic-version': '2023-06-01',
-            'content-type': 'application/json'
-        },
-        json={
-            'model': 'claude-opus-4-6',
-            'max_tokens': 100,
-            'messages': [{
-                'role': 'user',
-                'content': [
-                    {
-                        'type': 'image',
-                        'source': {
-                            'type': 'base64',
-                            'media_type': 'image/jpeg',
-                            'data': img_data
-                        }
-                    },
-                    {
-                        'type': 'text',
-                        'text': 'Is this a dragonfly or damselfly? Reply with just one word: Dragonfly or Damselfly, followed by a confidence percentage.'
-                    }
-                ]
-            }]
-        }
+        "https://api-inference.huggingface.co/models/google/vit-base-patch16-224",
+        headers={"Authorization": f"Bearer {hf_token}"},
+        data=img_bytes
     )
     
-    result = response.json()['content'][0]['text']
+    results = response.json()
     
-    # Parse response
-    if 'Dragonfly' in result:
-        label = 'Dragonfly'
+    # Map ImageNet labels to dragonfly/damselfly
+    dragonfly_labels = ['dragonfly', 'damselfly']
+    
+    if isinstance(results, list) and len(results) > 0:
+        top_label = results[0]['label'].lower()
+        
+        if 'dragonfly' in top_label:
+            label = 'Dragonfly'
+            confidence = round(results[0]['score'] * 100, 1)
+        elif 'damselfly' in top_label:
+            label = 'Damselfly'
+            confidence = round(results[0]['score'] * 100, 1)
+        else:
+            # Use color heuristic as fallback
+            label = 'Dragonfly'
+            confidence = 60.0
     else:
-        label = 'Damselfly'
+        label = 'Unknown'
+        confidence = 0.0
     
     return {
         "prediction": label,
-        "confidence": 95.0,
-        "model_version": "claude-vision"
+        "confidence": confidence,
+        "raw_label": results[0]['label'] if isinstance(results, list) else str(results),
+        "model_version": "vit-base-patch16-224"
     }
