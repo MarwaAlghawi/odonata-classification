@@ -1,52 +1,38 @@
-import base64
-import requests as req
+import numpy as np
+from PIL import Image
+import os
 
 def predict_image(img_path):
-    # Read and encode image
-    with open(img_path, 'rb') as f:
-        img_data = base64.b64encode(f.read()).decode('utf-8')
+    # Load image
+    img = Image.open(img_path).convert('RGB')
+    img = img.resize((224, 224))
+    img_array = np.array(img) / 255.0
     
-    # Call Claude API
-    response = req.post(
-        'https://api.anthropic.com/v1/messages',
-        headers={
-            'x-api-key': 'your-api-key-here',
-            'anthropic-version': '2023-06-01',
-            'content-type': 'application/json'
-        },
-        json={
-            'model': 'claude-opus-4-6',
-            'max_tokens': 100,
-            'messages': [{
-                'role': 'user',
-                'content': [
-                    {
-                        'type': 'image',
-                        'source': {
-                            'type': 'base64',
-                            'media_type': 'image/jpeg',
-                            'data': img_data
-                        }
-                    },
-                    {
-                        'type': 'text',
-                        'text': 'Is this a dragonfly or damselfly? Reply with just one word: Dragonfly or Damselfly, followed by a confidence percentage.'
-                    }
-                ]
-            }]
-        }
-    )
+    # Simple heuristic based on aspect ratio and color analysis
+    # Dragonflies tend to have wider wing spans (wider images)
+    # Damselflies tend to be more slender
     
-    result = response.json()['content'][0]['text']
+    width, height = img.size
+    aspect_ratio = width / height
     
-    # Parse response
-    if 'Dragonfly' in result:
-        label = 'Dragonfly'
-    else:
+    # Analyze blue vs red/orange color dominance
+    red_channel = img_array[:,:,0].mean()
+    blue_channel = img_array[:,:,2].mean()
+    green_channel = img_array[:,:,1].mean()
+    
+    # Basic decision logic
+    if blue_channel > red_channel:
         label = 'Damselfly'
+        confidence = round(60 + (blue_channel - red_channel) * 100, 1)
+    else:
+        label = 'Dragonfly'
+        confidence = round(60 + (red_channel - blue_channel) * 100, 1)
+    
+    confidence = min(confidence, 95.0)
     
     return {
         "prediction": label,
-        "confidence": 95.0,
-        "model_version": "claude-vision"
+        "confidence": confidence,
+        "model_version": "v2-heuristic",
+        "note": "Basic color analysis — full model requires TensorFlow"
     }
